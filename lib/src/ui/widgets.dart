@@ -33,7 +33,7 @@ class BpmReadout extends StatelessWidget {
                 AnimatedDefaultTextStyle(
                   duration: const Duration(milliseconds: 200),
                   style: theme.textTheme.displayLarge!.copyWith(
-                    fontSize: MediaQuery.sizeOf(context).height < 700 ? 64 : 88,
+                    fontSize: CompactLayout.of(context) ? 68 : 88,
                     fontWeight: FontWeight.w300,
                     height: 1,
                     color: color,
@@ -54,17 +54,29 @@ class BpmReadout extends StatelessWidget {
             ),
           ),
           if (caption != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              caption!,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium!.copyWith(color: BpmColors.textMuted),
+            const SizedBox(height: 6),
+            // Always two lines high, so a changing caption never moves the
+            // rest of the page.
+            SizedBox(
+              height: _captionHeight(context, theme.textTheme.bodyMedium!),
+              child: Text(
+                caption!,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium!.copyWith(color: BpmColors.textMuted),
+              ),
             ),
           ],
         ],
       ),
     );
   }
+}
+
+double _captionHeight(BuildContext context, TextStyle style) {
+  final fontSize = MediaQuery.textScalerOf(context).scale(style.fontSize ?? 14);
+  return 2 * fontSize * (style.height ?? 1.45) + 2;
 }
 
 /// A small labelled value, e.g. "Taps 12".
@@ -219,8 +231,27 @@ class _PulsePainter extends CustomPainter {
   bool shouldRepaint(_PulsePainter old) => old.progress != progress || old.active != active;
 }
 
-/// Lays out [info] and [pad] in a column on portrait screens and side by
-/// side on wide ones (landscape phones, tablets, foldables, desktop windows).
+/// Whether the page is short and the content should use its compact sizes
+/// (smaller numbers, tighter spacing). Set by [AdaptiveSplit].
+class CompactLayout extends InheritedWidget {
+  const CompactLayout({super.key, required this.compact, required super.child});
+
+  final bool compact;
+
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<CompactLayout>()?.compact ?? false;
+
+  @override
+  bool updateShouldNotify(CompactLayout old) => old.compact != compact;
+}
+
+/// Lays out [info] and [pad] as one page that never scrolls: in a column on
+/// portrait screens and side by side on wide ones (landscape phones,
+/// tablets, foldables, desktop windows).
+///
+/// The info keeps its natural size and the round pad takes the space that
+/// is left. Only if the info alone would not fit (tiny screens, very large
+/// text) it is scaled down instead of scrolling.
 class AdaptiveSplit extends StatelessWidget {
   const AdaptiveSplit({super.key, required this.info, required this.pad});
 
@@ -232,35 +263,35 @@ class AdaptiveSplit extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth > constraints.maxHeight * 1.1;
-        final padding = EdgeInsets.symmetric(
-          horizontal: constraints.maxWidth > 600 ? 32 : 16,
-          vertical: 12,
+        final horizontal = constraints.maxWidth > 600 ? 32.0 : 16.0;
+        final compact = wide ? constraints.maxHeight < 480 : constraints.maxHeight < 720;
+        final padding = EdgeInsets.symmetric(horizontal: horizontal, vertical: compact ? 8 : 12);
+
+        Widget fitted(double width) => FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.topCenter,
+          child: SizedBox(width: width, child: info),
         );
+
+        final Widget content;
         if (wide) {
-          return Padding(
-            padding: padding,
-            child: Row(
-              children: [
-                Expanded(
-                  child: Center(child: SingleChildScrollView(child: info)),
-                ),
-                const SizedBox(width: 24),
-                Expanded(child: Center(child: pad)),
-              ],
-            ),
-          );
-        }
-        return Padding(
-          padding: padding,
-          child: Column(
+          final columnWidth = (constraints.maxWidth - 2 * horizontal - 24) / 2;
+          content = Row(
             children: [
-              // The pad gets whatever the info leaves; on very small screens
-              // (or with large text) the info scrolls so the pad stays usable.
+              Expanded(child: Center(child: fitted(columnWidth))),
+              const SizedBox(width: 24),
+              Expanded(child: Center(child: pad)),
+            ],
+          );
+        } else {
+          content = Column(
+            children: [
+              // At most 60 % for the info, so the pad always stays usable.
               ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: constraints.maxHeight * 0.55),
-                child: SingleChildScrollView(child: info),
+                constraints: BoxConstraints(maxHeight: constraints.maxHeight * 0.6),
+                child: fitted(constraints.maxWidth - 2 * horizontal),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: compact ? 8 : 12),
               Expanded(
                 child: Center(
                   child: ConstrainedBox(
@@ -270,9 +301,25 @@ class AdaptiveSplit extends StatelessWidget {
                 ),
               ),
             ],
-          ),
+          );
+        }
+        return CompactLayout(
+          compact: compact,
+          child: Padding(padding: padding, child: content),
         );
       },
     );
   }
+}
+
+/// Vertical space that shrinks in a [CompactLayout].
+class AdaptiveGap extends StatelessWidget {
+  const AdaptiveGap(this.regular, {super.key, required this.compact});
+
+  final double regular;
+  final double compact;
+
+  @override
+  Widget build(BuildContext context) =>
+      SizedBox(height: CompactLayout.of(context) ? compact : regular);
 }

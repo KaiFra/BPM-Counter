@@ -56,29 +56,35 @@ class _ListenViewState extends State<ListenView> {
     final info = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (c.phoneAudioAvailable) _SourceSelector(controller: c) else const SizedBox(height: 8),
+        if (c.phoneAudioAvailable)
+          _SourceSelector(controller: c)
+        else
+          const AdaptiveGap(8, compact: 0),
         BpmReadout(bpm: c.bpm, caption: _caption(c), dimmed: !listening || c.confidence < 0.2),
-        const SizedBox(height: 20),
+        const AdaptiveGap(20, compact: 10),
         Card(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                SizedBox(
-                  height: 56,
-                  child: CustomPaint(
-                    key: const Key('envelope-graph'),
-                    painter: EnvelopePainter(listening ? c.envelope : null),
+                // Builder: the compact flag is only known below AdaptiveSplit.
+                Builder(
+                  builder: (context) => SizedBox(
+                    height: CompactLayout.of(context) ? 40 : 56,
+                    child: CustomPaint(
+                      key: const Key('envelope-graph'),
+                      painter: EnvelopePainter(listening ? c.envelope : null),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const AdaptiveGap(10, compact: 6),
                 LevelMeter(levelDb: listening ? c.levelDb : null, gateDb: c.settings.noiseGateDb),
               ],
             ),
           ),
         ),
-        const SizedBox(height: 8),
+        const AdaptiveGap(8, compact: 4),
         Row(
           children: [
             Expanded(
@@ -149,8 +155,7 @@ class _ListenViewState extends State<ListenView> {
       case ListenStatus.starting:
         return phone ? 'Waiting for permission to capture…' : 'Starting microphone…';
       case ListenStatus.permissionDenied:
-        return 'Microphone access was denied. Allow it under Settings › Apps › '
-            'BPM Counter › Permissions, or use the tap mode.';
+        return 'Microphone access denied – allow it in Settings › Apps › BPM Counter';
       case ListenStatus.error:
         return phone
             ? 'Phone audio could not be captured (${c.errorMessage}).'
@@ -175,7 +180,7 @@ class _SourceSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.only(bottom: CompactLayout.of(context) ? 4 : 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [

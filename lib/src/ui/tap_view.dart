@@ -65,9 +65,9 @@ class _TapViewState extends State<TapView> {
     final info = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const SizedBox(height: 8),
+        const AdaptiveGap(8, compact: 0),
         BpmReadout(bpm: _tracker.bpm, caption: _caption, dimmed: _tracker.taps < 2),
-        const SizedBox(height: 20),
+        const AdaptiveGap(20, compact: 10),
         Row(
           children: [
             Expanded(
@@ -86,7 +86,7 @@ class _TapViewState extends State<TapView> {
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const AdaptiveGap(8, compact: 4),
         Row(
           children: [
             Expanded(

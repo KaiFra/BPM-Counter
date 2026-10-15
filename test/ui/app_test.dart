@@ -4,6 +4,7 @@ import 'package:bpmcounter/src/app.dart';
 import 'package:bpmcounter/src/audio/detector_settings.dart';
 import 'package:bpmcounter/src/audio/settings_store.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -157,7 +158,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('listen-pad')));
       await tester.pump();
-      expect(find.textContaining('Microphone access was denied'), findsOneWidget);
+      expect(find.textContaining('Microphone access denied'), findsOneWidget);
     });
 
     testWidgets('filter sheet changes and stores the settings', (tester) async {
@@ -291,23 +292,47 @@ void main() {
   });
 
   group('Layout', () {
+    // Logical sizes; the S24 entry includes status and navigation bars.
     const sizes = {
-      'small phone': Size(320, 568),
-      'phone': phone,
-      'phone landscape': Size(914, 411),
-      'foldable': Size(673, 841),
-      'tablet landscape': Size(1280, 800),
+      'small phone': (Size(320, 568), EdgeInsets.zero),
+      'Galaxy S24': (Size(360, 780), EdgeInsets.only(top: 32, bottom: 48)),
+      'phone': (phone, EdgeInsets.zero),
+      'phone landscape': (Size(914, 411), EdgeInsets.zero),
+      'foldable': (Size(673, 841), EdgeInsets.zero),
+      'tablet landscape': (Size(1280, 800), EdgeInsets.zero),
     };
-    for (final MapEntry(key: name, value: size) in sizes.entries) {
-      testWidgets('renders both modes without overflow on a $name', (tester) async {
+    for (final MapEntry(key: name, value: (size, insets)) in sizes.entries) {
+      testWidgets('both modes fit on one page on a $name', (tester) async {
+        tester.view.padding = FakeViewPadding(
+          top: insets.top * 2.625,
+          bottom: insets.bottom * 2.625,
+        );
+        addTearDown(tester.view.resetPadding);
         // With the phone audio switch: the most crowded variant.
         await pumpApp(tester, size: size, phoneInput: FakeAudioInput());
         expect(tester.takeException(), isNull);
+        expect(find.byType(Scrollable), findsNothing);
+        expect(tester.getSize(find.byKey(const Key('tap-pad'))).shortestSide, greaterThan(150));
+
         await tester.tap(find.text('Listen'));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
-        expect(tester.getSize(find.byKey(const Key('listen-pad'))).shortestSide, greaterThan(140));
+        expect(find.byType(Scrollable), findsNothing);
+        expect(tester.getSize(find.byKey(const Key('listen-pad'))).shortestSide, greaterThan(150));
       });
     }
+
+    testWidgets('the Galaxy S24 shows everything at full size', (tester) async {
+      tester.view.padding = const FakeViewPadding(top: 32 * 2.625, bottom: 48 * 2.625);
+      addTearDown(tester.view.resetPadding);
+      await pumpApp(tester, size: const Size(360, 780), phoneInput: FakeAudioInput());
+      await tester.tap(find.text('Listen'));
+      await tester.pumpAndSettle();
+      // Not scaled down: the info fits in its natural size.
+      final fitted = tester.renderObject<RenderBox>(find.byType(FittedBox).first);
+      final child = (fitted as RenderObjectWithChildMixin<RenderBox>).child!;
+      expect(fitted.size.height, closeTo(child.size.height, 0.5));
+      expect(tester.getSize(find.byKey(const Key('listen-pad'))).shortestSide, greaterThan(230));
+    });
   });
 }
