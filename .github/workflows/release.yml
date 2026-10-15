@@ -113,7 +113,7 @@ jobs:
         run: tool/check_apk_abi.sh dist/bpm-counter-${{ steps.version.outputs.name }}.apk
 
       - name: Publish release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           # Creates the tag on the built commit if it does not exist yet (Run workflow).
           tag_name: ${{ steps.version.outputs.tag }}
