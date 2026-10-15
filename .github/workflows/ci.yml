@@ -47,7 +47,7 @@ jobs:
         run: tool/check_apk_permissions.sh build/app/outputs/flutter-apk/app-release.apk
       - name: Check ABI and report size
         run: tool/check_apk_abi.sh build/app/outputs/flutter-apk/app-release.apk
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: bpm-counter-${{ github.sha }}
           path: build/app/outputs/flutter-apk/app-release.apk
