@@ -53,12 +53,6 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
-            // Release APKs contain 64-bit ARM code only. This also drops native libraries
-            // that dependencies ship for other ABIs, so 32-bit phones refuse to install the
-            // APK instead of crashing on launch. Debug builds keep all ABIs for emulators.
-            ndk {
-                abiFilters += "arm64-v8a"
-            }
         }
     }
 
@@ -75,6 +69,20 @@ android {
             // doubles the size of the APK people download.
             useLegacyPackaging = true
         }
+    }
+}
+
+// Release APKs contain 64-bit ARM code only. Besides the Flutter engine, dependencies such
+// as AndroidX DataStore ship native libraries for other ABIs; with those left in, a 32-bit
+// phone would install the APK and then crash on launch instead of refusing to install it.
+// Debug builds keep all ABIs, so `flutter run` still works on x86_64 emulators.
+androidComponents {
+    onVariants(selector().withBuildType("release")) { variant ->
+        variant.packaging.jniLibs.excludes.addAll(
+            "**/armeabi-v7a/**",
+            "**/x86/**",
+            "**/x86_64/**",
+        )
     }
 }
 
