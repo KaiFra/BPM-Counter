@@ -1,9 +1,18 @@
 name: Release
 
-# Push a tag like v2.1.0 to build, sign and publish a GitHub release.
+# Builds, signs and publishes a GitHub release. Two ways to start it:
+# - Actions -> Release -> Run workflow, enter a version like 2.1.0. The workflow
+#   creates the tag v2.1.0 on the default branch when it publishes the release.
+# - Push a tag like v2.1.0.
 on:
   push:
     tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, e.g. 2.1.0 (creates the tag v2.1.0)"
+        required: true
+        type: string
 
 env:
   FLUTTER_VERSION: "3.47.7"
@@ -11,11 +20,46 @@ env:
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+
+      - name: Determine version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            if [[ "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ]]; then
+              echo "::error::Releases are only made from $DEFAULT_BRANCH, not $GITHUB_REF_NAME"; exit 1
+            fi
+            version="${INPUT_VERSION#v}"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          if [[ ! "$version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "::error::Version must look like 1.2.3, got '$version'"; exit 1
+          fi
+          major=${BASH_REMATCH[1]} minor=${BASH_REMATCH[2]} patch=${BASH_REMATCH[3]}
+          if (( minor > 99 || patch > 99 )); then
+            echo "::error::Minor and patch must be below 100"; exit 1
+          fi
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]] \
+              && [[ -n "$(git ls-remote --tags origin "refs/tags/v$version")" ]]; then
+            echo "::error::Tag v$version already exists"; exit 1
+          fi
+          # Monotonic Android versionCode: 2.1.3 -> 20103
+          echo "name=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "code=$(( major * 10000 + minor * 100 + patch ))" >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -25,21 +69,6 @@ jobs:
           channel: stable
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
-
-      - name: Derive version from tag
-        id: version
-        run: |
-          version="${GITHUB_REF_NAME#v}"
-          if [[ ! "$version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-            echo "::error::Tag must look like v1.2.3, got $GITHUB_REF_NAME"; exit 1
-          fi
-          major=${BASH_REMATCH[1]} minor=${BASH_REMATCH[2]} patch=${BASH_REMATCH[3]}
-          if (( minor > 99 || patch > 99 )); then
-            echo "::error::Minor and patch must be below 100"; exit 1
-          fi
-          # Monotonic Android versionCode: 2.1.3 -> 20103
-          echo "name=$version" >> "$GITHUB_OUTPUT"
-          echo "code=$(( major * 10000 + minor * 100 + patch ))" >> "$GITHUB_OUTPUT"
 
       - run: flutter pub get
       - run: flutter analyze
@@ -86,6 +115,9 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
+          # Creates the tag on the built commit if it does not exist yet (Run workflow).
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           name: BPM Counter ${{ steps.version.outputs.name }}
           generate_release_notes: true
           prerelease: ${{ steps.signing.outputs.signed != 'true' }}

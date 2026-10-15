@@ -161,16 +161,21 @@ tool/check_apk_abi.sh         fails if an APK contains anything but 64-bit ARM c
 
 ## Releases
 
-Releases are built by GitHub Actions (`.github/workflows/release.yml`). To publish one:
+Releases are built by GitHub Actions (`.github/workflows/release.yml`). To publish one, either
 
-```sh
-git tag v2.0.0
-git push origin v2.0.0
-```
+- open *Actions → Release → Run workflow* on GitHub, keep the branch `master` and enter the
+  version, e.g. `2.0.0`. The workflow creates the tag `v2.0.0` when it publishes the release.
+- or push a tag yourself:
+
+  ```sh
+  git tag v2.0.0
+  git push origin v2.0.0
+  ```
 
 The workflow runs the tests, builds the APK with version name `2.0.0` and version code
-`20000` (`major * 10000 + minor * 100 + patch`), verifies its permissions and creates a GitHub
-release with the APK and its checksum.
+`20000` (`major * 10000 + minor * 100 + patch`), verifies its permissions and ABI and creates a
+GitHub release with the APK and its checksum. If the build fails, no tag and no release are
+created.
 
 Signing: add these repository secrets (*Settings → Secrets and variables → Actions*) so that
 releases are signed with your key and can be updated in place:
