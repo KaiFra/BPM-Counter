@@ -1,21 +1,30 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="flkaiser.de.bpmcounter">
-    <!-- io.flutter.app.FlutterApplication is an android.app.Application that
-         calls FlutterMain.startInitialization(this); in its onCreate method.
-         In most cases you can leave this as-is, but you if you want to provide
-         additional functionality it is fine to subclass or reimplement
-         FlutterApplication and put your custom class here. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- The only permission the app asks for: live tempo detection in "Listen" mode.
+         Audio is analysed in memory and never stored or sent anywhere. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- A microphone is useful but not required: the tap mode works without one. -->
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+
     <application
-        android:name="io.flutter.app.FlutterApplication"
         android:label="BPM Counter"
-        android:icon="@mipmap/ic_launcher">
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher"
+        android:enableOnBackInvokedCallback="true">
         <activity
             android:name=".MainActivity"
+            android:exported="true"
             android:launchMode="singleTop"
+            android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
+            <meta-data
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/NormalTheme"
+              />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
