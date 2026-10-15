@@ -113,4 +113,90 @@ void main() {
     expect(other.disposed, isTrue);
     expect(other.isRunning, isFalse);
   });
+
+  group('phone audio source', () {
+    late FakeAudioInput phone;
+    late ListenController c;
+
+    setUp(() async {
+      phone = FakeAudioInput();
+      c = ListenController(input: input, phoneAudioInput: phone, store: store);
+      await c.init();
+    });
+
+    tearDown(() => c.dispose());
+
+    test('is offered when available', () {
+      expect(c.phoneAudioAvailable, isTrue);
+      expect(c.source, AudioSource.microphone);
+    });
+
+    test('is not offered when unavailable', () async {
+      final unavailable = ListenController(
+        input: FakeAudioInput(),
+        phoneAudioInput: FakeAudioInput(available: false),
+        store: store,
+      );
+      await unavailable.init();
+      expect(unavailable.phoneAudioAvailable, isFalse);
+      await unavailable.setSource(AudioSource.phoneAudio);
+      expect(unavailable.source, AudioSource.microphone);
+      unavailable.dispose();
+    });
+
+    test('listens to the selected source', () async {
+      await c.setSource(AudioSource.phoneAudio);
+      await c.start();
+      expect(phone.isRunning, isTrue);
+      expect(input.isRunning, isFalse);
+
+      phone.emit(drumLoop(bpm: 118, seconds: 7, noiseLevel: 0));
+      await pumpEventQueue();
+      expect(c.bpm, closeTo(118, 0.3));
+
+      await c.stop();
+      expect(phone.isRunning, isFalse);
+    });
+
+    test('switching the source while listening stops and clears', () async {
+      await c.start();
+      input.emit(drumLoop(bpm: 120, seconds: 6));
+      await pumpEventQueue();
+      expect(c.bpm, isNotNull);
+
+      await c.setSource(AudioSource.phoneAudio);
+      expect(input.isRunning, isFalse);
+      expect(c.status, ListenStatus.idle);
+      expect(c.bpm, isNull);
+    });
+
+    test('declining the capture dialog just goes back to idle', () async {
+      await c.setSource(AudioSource.phoneAudio);
+      phone.declineStart = true;
+      await c.start();
+      expect(c.status, ListenStatus.idle);
+      expect(c.errorMessage, isNull);
+      await c.start();
+      expect(c.status, ListenStatus.listening);
+    });
+
+    test('capture stopped by the system goes back to idle', () async {
+      await c.setSource(AudioSource.phoneAudio);
+      await c.start();
+      await phone.endFromSystem();
+      await pumpEventQueue();
+      expect(c.status, ListenStatus.idle);
+      await c.start();
+      expect(c.status, ListenStatus.listening);
+    });
+
+    test('dispose releases both inputs', () async {
+      final mic = FakeAudioInput(), other = FakeAudioInput();
+      final d = ListenController(input: mic, phoneAudioInput: other, store: store);
+      d.dispose();
+      await pumpEventQueue();
+      expect(mic.disposed, isTrue);
+      expect(other.disposed, isTrue);
+    });
+  });
 }

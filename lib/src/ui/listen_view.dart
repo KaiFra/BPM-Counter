@@ -25,8 +25,13 @@ class _ListenViewState extends State<ListenView> {
   @override
   void initState() {
     super.initState();
-    // Never keep the microphone open in the background.
-    _lifecycle = AppLifecycleListener(onHide: widget.controller.stop);
+    // Never keep capturing in the background. While starting, a system
+    // dialog (permission, screen capture consent) may be in front.
+    _lifecycle = AppLifecycleListener(
+      onHide: () {
+        if (widget.controller.status != ListenStatus.starting) widget.controller.stop();
+      },
+    );
   }
 
   @override
@@ -51,7 +56,7 @@ class _ListenViewState extends State<ListenView> {
     final info = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const SizedBox(height: 8),
+        if (c.phoneAudioAvailable) _SourceSelector(controller: c) else const SizedBox(height: 8),
         BpmReadout(bpm: c.bpm, caption: _caption(c), dimmed: !listening || c.confidence < 0.2),
         const SizedBox(height: 20),
         Card(
@@ -109,7 +114,13 @@ class _ListenViewState extends State<ListenView> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(listening ? Icons.mic : Icons.mic_none, size: 40, color: BpmColors.green),
+              Icon(
+                c.source == AudioSource.phoneAudio
+                    ? Icons.graphic_eq
+                    : (listening ? Icons.mic : Icons.mic_none),
+                size: 40,
+                color: BpmColors.green,
+              ),
               const SizedBox(height: 8),
               Text(
                 listening || c.status == ListenStatus.starting ? 'STOP' : 'LISTEN',
@@ -129,22 +140,129 @@ class _ListenViewState extends State<ListenView> {
   }
 
   String _caption(ListenController c) {
+    final phone = c.source == AudioSource.phoneAudio;
     switch (c.status) {
       case ListenStatus.idle:
-        return 'Tap the circle to start listening';
+        return phone
+            ? 'Play music in any app, then tap the circle'
+            : 'Tap the circle to start listening';
       case ListenStatus.starting:
-        return 'Starting microphone…';
+        return phone ? 'Waiting for permission to capture…' : 'Starting microphone…';
       case ListenStatus.permissionDenied:
         return 'Microphone access was denied. Allow it under Settings › Apps › '
             'BPM Counter › Permissions, or use the tap mode.';
       case ListenStatus.error:
-        return 'The microphone could not be used (${c.errorMessage}).';
+        return phone
+            ? 'Phone audio could not be captured (${c.errorMessage}).'
+            : 'The microphone could not be used (${c.errorMessage}).';
       case ListenStatus.listening:
         if (c.warmUp < 1) return 'Listening… ${(c.warmUp * 100).round()} %';
+        if (phone && !(c.levelDb > LevelMeter.floorDb)) {
+          return 'No sound – nothing playing, or the app blocks capture (see ?)';
+        }
         if (c.bpm == null) return 'No clear beat yet – try other filters';
         return 'Confidence ${(c.confidence * 100).round()} %';
     }
   }
+}
+
+/// Microphone / phone audio switch with a help button for the limitations.
+class _SourceSelector extends StatelessWidget {
+  const _SourceSelector({required this.controller});
+
+  final ListenController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Flexible(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // Icons only where there is room (not on very small phones).
+                final icons = constraints.maxWidth >= 300;
+                return SegmentedButton<AudioSource>(
+                  key: const Key('source-selector'),
+                  showSelectedIcon: false,
+                  style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                  segments: [
+                    ButtonSegment(
+                      value: AudioSource.microphone,
+                      icon: icons ? const Icon(Icons.mic_none, size: 18) : null,
+                      label: const Text('Microphone', maxLines: 1, softWrap: false),
+                    ),
+                    ButtonSegment(
+                      value: AudioSource.phoneAudio,
+                      icon: icons ? const Icon(Icons.graphic_eq, size: 18) : null,
+                      label: const Text('Phone audio', maxLines: 1, softWrap: false),
+                    ),
+                  ],
+                  selected: {controller.source},
+                  onSelectionChanged: (selection) => controller.setSource(selection.first),
+                );
+              },
+            ),
+          ),
+          IconButton(
+            key: const Key('source-help'),
+            tooltip: 'About phone audio',
+            icon: const Icon(Icons.help_outline),
+            color: BpmColors.textMuted,
+            onPressed: () => showPhoneAudioHelp(context),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+Future<void> showPhoneAudioHelp(BuildContext context) {
+  final theme = Theme.of(context);
+  Widget point(String text) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(top: 7, right: 10),
+          child: Icon(Icons.circle, size: 6, color: BpmColors.green),
+        ),
+        Expanded(child: Text(text, style: theme.textTheme.bodyMedium)),
+      ],
+    ),
+  );
+  return showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: BpmColors.surfaceHigh,
+      title: const Text('Phone audio'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            point('Analyses what other apps play – no room noise, works with headphones.'),
+            point(
+              'Android asks to allow screen recording each time. Only the sound is '
+              'analysed; nothing is stored or sent.',
+            ),
+            point(
+              'Some apps, often streaming apps with copy protection, block this. '
+              'The level then stays empty – use the microphone.',
+            ),
+            point(
+              'Capturing stops when you leave BPM Counter: start the music first, '
+              'then come back.',
+            ),
+          ],
+        ),
+      ),
+      actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK'))],
+    ),
+  );
 }
 
 /// Human-readable summary of the filter band, e.g. "Kick & bass · below 200 Hz".

@@ -1,8 +1,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- The only permission the app asks for: live tempo detection in "Listen" mode.
+    <!-- The only permission the app asks the user for: live tempo detection in "Listen" mode.
          Audio is analysed in memory and never stored or sent anywhere. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Optional "phone audio" source (Android 10+): Android only allows capturing
+         other apps' audio from a foreground service of type mediaProjection, after the
+         user accepted the screen capture dialog. Both are normal permissions, granted at
+         install without a prompt. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
 
     <!-- A microphone is useful but not required: the tap mode works without one. -->
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
@@ -30,6 +37,10 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <service
+            android:name=".PlaybackCaptureService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

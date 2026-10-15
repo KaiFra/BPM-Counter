@@ -14,13 +14,26 @@ void main() {
           .map((m) => m.group(1)!)
           .toSet();
 
-  test('main manifest only asks for the microphone', () {
+  test('main manifest: microphone plus what phone audio capture requires', () {
     final manifest = read('android/app/src/main/AndroidManifest.xml');
-    expect(usedPermissions(manifest), {'android.permission.RECORD_AUDIO'});
+    expect(usedPermissions(manifest), {
+      'android.permission.RECORD_AUDIO',
+      // Install-time permissions for the phone audio foreground service.
+      'android.permission.FOREGROUND_SERVICE',
+      'android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION',
+    });
     expect(
       manifest,
       contains('android:name="android.hardware.microphone" android:required="false"'),
     );
+  });
+
+  test('the capture service is private and typed for media projection', () {
+    final manifest = read('android/app/src/main/AndroidManifest.xml');
+    final service = RegExp(r'<service[^>]*PlaybackCaptureService[^>]*/>').firstMatch(manifest);
+    expect(service, isNotNull);
+    expect(service![0], contains('android:exported="false"'));
+    expect(service[0], contains('android:foregroundServiceType="mediaProjection"'));
   });
 
   test('release builds strip network permissions', () {

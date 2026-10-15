@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:bpmcounter/src/app.dart';
 import 'package:bpmcounter/src/audio/detector_settings.dart';
 import 'package:bpmcounter/src/audio/settings_store.dart';
@@ -14,13 +16,19 @@ Future<void> pumpApp(
   WidgetTester tester, {
   Size size = phone,
   FakeAudioInput? input,
+  FakeAudioInput? phoneInput,
   SettingsStore? store,
 }) async {
   tester.view.devicePixelRatio = 2.625;
   tester.view.physicalSize = size * 2.625;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
-    BpmApp(audioInput: input ?? FakeAudioInput(), settingsStore: store ?? MemorySettingsStore()),
+    BpmApp(
+      audioInput: input ?? FakeAudioInput(),
+      // Unavailable by default, like on devices below Android 10.
+      phoneAudioInput: phoneInput ?? FakeAudioInput(available: false),
+      settingsStore: store ?? MemorySettingsStore(),
+    ),
   );
   await tester.pumpAndSettle();
 }
@@ -204,6 +212,84 @@ void main() {
     });
   });
 
+  group('Phone audio', () {
+    Future<void> openListen(WidgetTester tester) async {
+      await tester.tap(find.text('Listen'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('the source switch only shows where capture is supported', (tester) async {
+      await pumpApp(tester);
+      await openListen(tester);
+      expect(find.byKey(const Key('source-selector')), findsNothing);
+      expect(find.byKey(const Key('source-help')), findsNothing);
+    });
+
+    testWidgets('listens to phone audio after switching', (tester) async {
+      final mic = FakeAudioInput(), phone = FakeAudioInput();
+      await pumpApp(tester, input: mic, phoneInput: phone);
+      await openListen(tester);
+
+      await tester.tap(find.text('Phone audio'));
+      await tester.pumpAndSettle();
+      expect(find.text('Play music in any app, then tap the circle'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('listen-pad')));
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(phone.isRunning, isTrue);
+      expect(mic.isRunning, isFalse);
+
+      phone.emit(drumLoop(bpm: 131, seconds: 8));
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(bpmText(tester), '131.0');
+
+      // Switching back stops the capture.
+      await tester.tap(find.text('Microphone'));
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(phone.isRunning, isFalse);
+      expect(bpmText(tester), '–');
+    });
+
+    testWidgets('hints at blocked apps when there is no sound', (tester) async {
+      final phone = FakeAudioInput();
+      await pumpApp(tester, phoneInput: phone);
+      await openListen(tester);
+      await tester.tap(find.text('Phone audio'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('listen-pad')));
+      await tester.pump(const Duration(milliseconds: 50));
+      phone.emit(Float64List(44100 * 4)); // silence: capture blocked
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(find.textContaining('blocks capture'), findsOneWidget);
+    });
+
+    testWidgets('declining the capture dialog goes back to idle', (tester) async {
+      final phone = FakeAudioInput()..declineStart = true;
+      await pumpApp(tester, phoneInput: phone);
+      await openListen(tester);
+      await tester.tap(find.text('Phone audio'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('listen-pad')));
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(find.text('LISTEN'), findsOneWidget);
+      expect(find.text('Play music in any app, then tap the circle'), findsOneWidget);
+    });
+
+    testWidgets('? explains the limitations', (tester) async {
+      await pumpApp(tester, phoneInput: FakeAudioInput());
+      await openListen(tester);
+      await tester.tap(find.byKey(const Key('source-help')));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.textContaining('allow screen recording each time'), findsOneWidget);
+      expect(find.textContaining('block this'), findsOneWidget);
+      expect(find.textContaining('stops when you leave'), findsOneWidget);
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+  });
+
   group('Layout', () {
     const sizes = {
       'small phone': Size(320, 568),
@@ -214,7 +300,8 @@ void main() {
     };
     for (final MapEntry(key: name, value: size) in sizes.entries) {
       testWidgets('renders both modes without overflow on a $name', (tester) async {
-        await pumpApp(tester, size: size);
+        // With the phone audio switch: the most crowded variant.
+        await pumpApp(tester, size: size, phoneInput: FakeAudioInput());
         expect(tester.takeException(), isNull);
         await tester.tap(find.text('Listen'));
         await tester.pumpAndSettle();

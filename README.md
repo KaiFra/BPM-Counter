@@ -10,8 +10,9 @@ microphone detect the tempo for you.
 - **Tap mode**: tap the big circle (or press <kbd>Space</kbd> / <kbd>Enter</kbd> on a
   keyboard) along with the music. You get the average tempo since your first tap, the
   tempo of your last few taps, the session peak and the previous session.
-- **Listen mode**: the app listens through the microphone and detects the tempo. High-pass
-  and low-pass filters let you focus on the instrument that carries the beat.
+- **Listen mode**: the app detects the tempo from the microphone, or directly from the audio
+  other apps play on the phone. High-pass and low-pass filters let you focus on the
+  instrument that carries the beat.
 - **Private**: the app has **no internet permission**. The only permission it asks for is
   the microphone, and only when you start the listen mode. Audio is analysed in memory and
   never stored or sent anywhere.
@@ -42,7 +43,8 @@ To check a download, compare its SHA-256 with `SHA256SUMS.txt` from the same rel
 
 ### Listen mode
 
-1. Switch to **Listen** and tap the circle. The first time, Android asks for microphone
+1. Switch to **Listen**, choose **Microphone** or **Phone audio** (see below) and tap the
+   circle. The first time, Android asks for microphone
    access.
 2. Hold the phone near the speaker. After about 3 seconds the tempo appears; it updates twice
    a second and settles over the next few seconds.
@@ -62,9 +64,26 @@ To check a download, compare its SHA-256 with `SHA256SUMS.txt` from the same rel
 
 Your filter settings are remembered.
 
+### Phone audio (Android 10+)
+
+**Phone audio** analyses what other apps play – no room noise, and it works with headphones.
+Tap **?** next to the switch for a short summary of the limitations:
+
+- Android treats this as screen recording: each time you start, it asks *"Start recording or
+  casting with BPM Counter?"*, and the status bar shows that capturing is active. Only the sound
+  is analysed; nothing is stored or sent.
+- Apps decide whether their audio may be captured. Most allow it, but some – often streaming
+  apps with copy protection – block it. The level meter then stays empty and the app says
+  so; use the microphone for those.
+- Capturing stops when you leave BPM Counter. Start the music first, then come back.
+- It needs two extra permissions, `FOREGROUND_SERVICE` and
+  `FOREGROUND_SERVICE_MEDIA_PROJECTION`. Android grants them at install without asking; they
+  only allow the capture service to run while you use it. There is still no internet access.
+
 ### How the detection works
 
-The microphone signal (44.1 kHz, no automatic gain or noise suppression) runs through the
+The audio signal (44.1 kHz; from the microphone without automatic gain or noise suppression,
+or the captured phone audio) runs through the
 selected filters (4th-order Butterworth high/low pass). Every 5 ms the loudness is measured;
 sudden rises in loudness, like a drum hit, form an "onset envelope". The autocorrelation of
 the last 8 seconds of that envelope shows which beat period repeats best. The display shows
@@ -124,11 +143,12 @@ lib/
       tempo_detector.dart     onset envelope + autocorrelation tempo estimation
       detector_settings.dart  filter settings and presets
       listen_controller.dart  microphone -> detector -> UI
-      audio_input.dart        microphone access (record plugin, 16-bit PCM)
+      audio_input.dart        microphone (record plugin) and phone audio inputs, 16-bit PCM
       settings_store.dart     remembers the filter settings
     ui/                       screens, theme and widgets
 test/                         unit and widget tests (synthetic drum loops, fake microphone)
-tool/check_apk_permissions.sh fails if an APK asks for more than the microphone
+android/app/src/main/kotlin/  phone audio capture (MediaProjection + AudioPlaybackCapture)
+tool/check_apk_permissions.sh fails if an APK asks for more permissions than listed above
 ```
 
 ## Releases

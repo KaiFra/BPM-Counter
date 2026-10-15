@@ -13,6 +13,9 @@ fi
 
 allowed=(
   "android.permission.RECORD_AUDIO"
+  # Install-time permissions for the optional "phone audio" capture service.
+  "android.permission.FOREGROUND_SERVICE"
+  "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"
   # Signature-level permission AndroidX declares for the app's own
   # broadcast receivers. Not user-visible, no access to anything.
   "flkaiser.de.bpmcounter.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
