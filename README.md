@@ -16,8 +16,8 @@ microphone detect the tempo for you.
 - **Private**: the app has **no internet permission**. The only permission it asks for is
   the microphone, and only when you start the listen mode. Audio is analysed in memory and
   never stored or sent anywhere.
-- Built for **Android 17** (API 37), runs on Android 8.0 and newer, including phones in
-  landscape, foldables and tablets.
+- Built for **Android 17** (API 37), runs on 64-bit ARM devices with Android 8.0 and newer,
+  including phones in landscape, foldables and tablets.
 
 ## Install
 
@@ -105,8 +105,14 @@ flutter pub get
 
 flutter test                  # run all tests
 flutter run                   # run on a connected device or emulator
-flutter build apk --release   # build/app/outputs/flutter-apk/app-release.apk
+
+# build/app/outputs/flutter-apk/app-release.apk
+flutter build apk --release --target-platform android-arm64
 ```
+
+Releases are built for 64-bit ARM only, which covers practically all phones from recent years.
+Without `--target-platform`, Flutter also includes 32-bit ARM and x86_64 code (for old phones
+and emulators), which makes the APK much larger.
 
 Install a built APK on a connected device with `flutter install` or
 `adb install build/app/outputs/flutter-apk/app-release.apk`.
@@ -149,6 +155,7 @@ lib/
 test/                         unit and widget tests (synthetic drum loops, fake microphone)
 android/app/src/main/kotlin/  phone audio capture (MediaProjection + AudioPlaybackCapture)
 tool/check_apk_permissions.sh fails if an APK asks for more permissions than listed above
+tool/check_apk_abi.sh         fails if an APK contains anything but 64-bit ARM code, reports its size
 ```
 
 ## Releases

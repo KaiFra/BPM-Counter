@@ -69,7 +69,7 @@ jobs:
 
       - name: Build APK
         run: |
-          flutter build apk --release \
+          flutter build apk --release --target-platform android-arm64 \
             --build-name=${{ steps.version.outputs.name }} \
             --build-number=${{ steps.version.outputs.code }}
           mkdir -p dist
@@ -80,6 +80,9 @@ jobs:
       - name: Check permissions
         run: tool/check_apk_permissions.sh dist/bpm-counter-${{ steps.version.outputs.name }}.apk
 
+      - name: Check ABI and report size
+        run: tool/check_apk_abi.sh dist/bpm-counter-${{ steps.version.outputs.name }}.apk
+
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
@@ -88,7 +91,7 @@ jobs:
           prerelease: ${{ steps.signing.outputs.signed != 'true' }}
           body: |
             Download **bpm-counter-${{ steps.version.outputs.name }}.apk** below and open it on your
-            phone to install (Android 8.0 or newer, built for Android 17).
+            phone to install (64-bit phone with Android 8.0 or newer, built for Android 17).
             See the [README](https://github.com/${{ github.repository }}#install) for details.
             ${{ steps.signing.outputs.signed != 'true' && '> ⚠️ Signed with a temporary debug key. Updates from future, properly signed releases will require uninstalling this version first.' || '' }}
           files: |

@@ -61,6 +61,15 @@ android {
         includeInApk = false
         includeInBundle = false
     }
+
+    packaging {
+        jniLibs {
+            // Store the native libraries (Flutter engine and app code) compressed. With
+            // minSdk 23 or higher they are stored uncompressed by default, which more than
+            // doubles the size of the APK people download.
+            useLegacyPackaging = true
+        }
+    }
 }
 
 kotlin {

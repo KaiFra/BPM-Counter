@@ -41,10 +41,12 @@ jobs:
           channel: stable
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
-      - name: Build release APK (debug-signed)
-        run: flutter build apk --release
+      - name: Build release APK (debug-signed, 64-bit ARM only)
+        run: flutter build apk --release --target-platform android-arm64
       - name: Check permissions
         run: tool/check_apk_permissions.sh build/app/outputs/flutter-apk/app-release.apk
+      - name: Check ABI and report size
+        run: tool/check_apk_abi.sh build/app/outputs/flutter-apk/app-release.apk
       - uses: actions/upload-artifact@v4
         with:
           name: bpm-counter-${{ github.sha }}
