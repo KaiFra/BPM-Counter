@@ -14,6 +14,8 @@ size="$(numfmt --to=si --format=%.1f --suffix=B "$(stat -c %s "$apk")")"
 
 echo "::notice title=APK::$size, native libraries: ${abis:-none}"
 if [[ "$abis" != "$expected" ]]; then
-  echo "::error::Expected native libraries only for $expected, found: ${abis:-none}"
+  others="$( (unzip -Z1 "$apk" 'lib/*' 2>/dev/null || true) \
+    | awk -v keep="lib/$expected/" 'index($0, keep) != 1 && !/\/$/' | paste -sd' ' -)"
+  echo "::error::Expected native libraries only for $expected, found: ${abis:-none}. Other files: ${others:-none}"
   exit 1
 fi

@@ -53,6 +53,12 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            // Release APKs contain 64-bit ARM code only. This also drops native libraries
+            // that dependencies ship for other ABIs, so 32-bit phones refuse to install the
+            // APK instead of crashing on launch. Debug builds keep all ABIs for emulators.
+            ndk {
+                abiFilters += "arm64-v8a"
+            }
         }
     }
 

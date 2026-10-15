@@ -110,9 +110,10 @@ flutter run                   # run on a connected device or emulator
 flutter build apk --release --target-platform android-arm64
 ```
 
-Releases are built for 64-bit ARM only, which covers practically all phones from recent years.
-Without `--target-platform`, Flutter also includes 32-bit ARM and x86_64 code (for old phones
-and emulators), which makes the APK much larger.
+Release builds contain 64-bit ARM code only, which covers practically all phones from recent
+years (see `abiFilters` in `android/app/build.gradle.kts`). `--target-platform android-arm64`
+skips compiling for the other ABIs, which makes the build faster. Debug builds (`flutter run`)
+still work on x86_64 emulators.
 
 Install a built APK on a connected device with `flutter install` or
 `adb install build/app/outputs/flutter-apk/app-release.apk`.
